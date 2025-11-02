@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>明日トレ！栄養チェック v8.0 (ローカル版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f7f9fc; }
+        .card { box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+        .pfc-indicator { transition: all 0.5s ease-in-out; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div id="app" class="max-w-4xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-blue-800 tracking-tight">明日トレ！栄養チェック v8.0</h1>
+            <p id="user-id-display" class="text-sm text-gray-500 mt-1">UserID: デモ版 (ローカル保存)</p>
+        </header>
+
+        <!-- メイングリッドレイアウト -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- 左側: 栄養記録と目標 -->
+            <div class="lg:col-span-2 space-y-6">
+                
+                <!-- 目標とPFC概要 -->
+                <div class="card bg-white p-6 rounded-xl border border-gray-200">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-700 flex justify-between items-center">
+                        今日の目標と進捗
+                        <span id="overall-face" class="text-4xl">🤔</span>
+                    </h2>
+                    
+                    <div id="target-summary" class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                        <!-- 目標PFCはJSで挿入 -->
+                    </div>
+
+                    <div id="pfc-visualization" class="mt-6 space-y-3">
+                        <!-- 栄養素の進捗バーはJSで挿入 -->
+                    </div>
+                </div>
+
+                <!-- 食事・運動入力 (手動入力機能を追加) -->
+                <div class="card bg-white p-6 rounded-xl border border-gray-200">
+                    <h2 class="text-xl font-bold mb-3 text-gray-700">食事・運動を記録</h2>
+                    
+                    <!-- 1. AI自動解析 (既存) -->
+                    <div class="mb-6 border-b pb-4 border-gray-200">
+                        <h3 class="font-semibold text-base mb-2 text-gray-600">① AI自動解析 (食事・運動を自由に入力)</h3>
+                        <div class="flex flex-col md:flex-row gap-2">
+                            <input type="text" id="log-input" placeholder="例: 鶏むね肉 150g, ご飯 200g, ランニング 30分" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                            <button id="submit-log" class="bg-blue-600 text-white p-3 rounded-lg font-semibold hover:bg-blue-700 transition duration-150 whitespace-nowrap">AIに記録させる</button>
+                        </div>
+                        <p id="log-status" class="text-sm mt-2 text-gray-500"></p>
+                    </div>
+
+                    <!-- 2. PFC手動入力 (新規追加 - 復活) -->
+                    <div>
+                        <h3 class="font-semibold text-base mb-2 text-gray-600">② PFC手動入力 (サプリや測定値など)</h3>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                            <input type="number" id="manual-p" placeholder="P (g)" class="p-3 border border-gray-300 rounded-lg text-center">
+                            <input type="number" id="manual-f" placeholder="F (g)" class="p-3 border border-gray-300 rounded-lg text-center">
+                            <input type="number" id="manual-c" placeholder="C (g)" class="p-3 border border-gray-300 rounded-lg text-center">
+                            <input type="number" id="manual-kcal" placeholder="Kcal" class="p-3 border border-gray-300 rounded-lg text-center">
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="text" id="manual-description" placeholder="説明 (例: プロテインシェイク、運動: -400)" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500">
+                            <button id="submit-manual-log" class="bg-purple-600 text-white p-3 rounded-lg font-semibold hover:bg-purple-700 transition duration-150 whitespace-nowrap">手動記録</button>
+                        </div>
+                        <p id="manual-log-status" class="text-sm mt-2 text-gray-500"></p>
+                    </div>
+                </div>
+
+                <!-- ログ履歴 -->
+                <div class="card bg-white p-6 rounded-xl border border-gray-200">
+                    <h2 class="text-xl font-bold mb-4 text-gray-700">今日の記録 (<span id="log-date"></span>)</h2>
+                    <div id="daily-log-entries" class="space-y-4">
+                        <p class="text-gray-500" id="no-log-message">まだ記録がありません。</p>
+                        <!-- ログはここに挿入 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右側: AIトレーナーとフィードバック -->
+            <div class="lg:col-span-1 space-y-6">
+                
+                <!-- AI栄養士チャット -->
+                <div class="card bg-gray-50 p-6 rounded-xl border border-gray-200">
+                    <h2 class="text-xl font-bold mb-4 text-blue-600 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2m-3 14v2m-6-2v2M5 10v4h14v-4H5zM10 5v14m4-14v14m-9-3h18"/>
+                        </svg>
+                        AIトレーナー (Gemini)
+                    </h2>
+                    
+                    <div id="chat-output" class="h-56 overflow-y-auto bg-white p-3 rounded-lg border border-gray-300 mb-3 space-y-3 text-sm">
+                        <div class="text-gray-500">こんにちは！今日の栄養やトレーニングの目標について何でも聞いてください。</div>
+                    </div>
+
+                    <div class="flex gap-2">
+                        <input type="text" id="chat-input" placeholder="質問を入力 (例: おすすめのプロテインは?)" class="flex-grow p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <button id="send-chat" class="bg-indigo-500 text-white p-2 rounded-lg font-semibold hover:bg-indigo-600 transition duration-150">送信</button>
+                    </div>
+                </div>
+
+                <!-- AIフィードバック -->
+                <div class="card bg-white p-6 rounded-xl border border-gray-200">
+                    <h2 class="text-xl font-bold mb-4 text-gray-700">AIアドバイス</h2>
+                    <div id="ai-feedback" class="text-gray-600 space-y-3 text-sm">
+                        <p id="p-score-feedback" class="font-semibold text-orange-500">タンパク質スコア: データを記録するとフィードバックが得られます。</p>
+                        <p id="next-day-advice">明日への戦略：AIが日々の記録から最適なアドバイスを提供します。</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <!-- モーダル（メッセージボックスとして利用） -->
+    <div id="modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full">
+            <h3 id="modal-title" class="text-xl font-bold mb-4 text-gray-800"></h3>
+            <p id="modal-message" class="text-gray-600 mb-6"></p>
+            <button id="modal-close" class="w-full bg-blue-600 text-white p-3 rounded-lg font-semibold hover:bg-blue-700 transition duration-150">閉じる</button>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        // 🚨 【AI機能のために修正必須】
+        // ----------------------------------------------------------------------------------
+        // AI機能（Gemini）を利用するためのAPIキーを設定してください。
+        // これはGoogle AI Studio（Google AI for Developers）で取得した専用キーを推奨します。
+        // 例: const GEMINI_API_KEY = 'AIzaSyXXXXXXXXXXXXXXXXXX';
+        const GEMINI_API_KEY = 'AIzaSyBtpm-Khdd6kKQKzCoSFXI2FsTPMy6ZUcM'; // ← 【重要】ここに君のAPIキーを貼り付ける！
+        // ----------------------------------------------------------------------------------
+
+        // Global Variables (Firebase関連は削除)
+        let userId = 'Demo-User-Local'; // ローカルストレージ版のデモID
+        let currentLogData = null; // 今日のログデータ
+        let currentTargets = null; // 目標データ
+
+        const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=";
+
+        // UI Elements
+        const logInput = document.getElementById('log-input');
+        const submitLogButton = document.getElementById('submit-log');
+        const dailyLogEntries = document.getElementById('daily-log-entries');
+        const logStatus = document.getElementById('log-status');
+        const targetSummary = document.getElementById('target-summary');
+        const pfcVisualization = document.getElementById('pfc-visualization');
+        const overallFace = document.getElementById('overall-face');
+        const chatInput = document.getElementById('chat-input');
+        const sendChatButton = document.getElementById('send-chat');
+        const chatOutput = document.getElementById('chat-output');
+        const modal = document.getElementById('modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalClose = document.getElementById('modal-close');
+        const pScoreFeedback = document.getElementById('p-score-feedback');
+        const nextDayAdvice = document.getElementById('next-day-advice');
+        const userIdDisplay = document.getElementById('user-id-display');
+        const noLogMessage = document.getElementById('no-log-message');
+
+        // 【新規追加されたUI要素】
+        const manualP = document.getElementById('manual-p');
+        const manualF = document.getElementById('manual-f');
+        const manualC = document.getElementById('manual-c');
+        const manualKcal = document.getElementById('manual-kcal');
+        const manualDescription = document.getElementById('manual-description');
+        const submitManualLogButton = document.getElementById('submit-manual-log');
+        const manualLogStatus = document.getElementById('manual-log-status');
+
+
+        // Helper Functions
+        const todayKey = () => new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+        
+        function showModal(title, message) {
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            modal.classList.remove('hidden');
+        }
+
+        modalClose.addEventListener('click', () => {
+            modal.classList.add('hidden');
+        });
+
+        function formatPFC(grams) {
+            return grams.toFixed(0) + 'g';
+        }
+
+        function formatKcal(kcal) {
+            return kcal.toFixed(0) + 'kcal';
+        }
+
+        // --- Local Storage Core Logic ---
+
+        function loadTargetsAndLogsFromLocal() {
+            // ターゲットのロード
+            const targetsJson = localStorage.getItem('nutrition_targets');
+            if (targetsJson) {
+                currentTargets = JSON.parse(targetsJson);
+            } else {
+                // 初期目標値の設定と保存
+                currentTargets = {
+                    protein: 150, fat: 60, carbs: 300, kcal: 2500, isInitialized: true 
+                };
+                localStorage.setItem('nutrition_targets', JSON.stringify(currentTargets));
+            }
+            
+            // 今日のログのロード
+            const logJson = localStorage.getItem(`daily_logs_${todayKey()}`);
+            if (logJson) {
+                currentLogData = JSON.parse(logJson);
+            } else {
+                currentLogData = {
+                    logs: [], P: 0, F: 0, C: 0, Kcal: 0, netKcal: 0, exerciseKcal: 0
+                };
+            }
+            
+            // チャット履歴のロード
+            const historyJson = localStorage.getItem('chat_history');
+            const history = historyJson ? JSON.parse(historyJson) : [];
+            renderChatHistory(history);
+
+            // UIの再描画
+            renderAllUI();
+        }
+
+        async function saveLogToLocal(updatedLog) {
+            localStorage.setItem(`daily_logs_${todayKey()}`, JSON.stringify(updatedLog));
+            currentLogData = updatedLog; // 即座に反映
+            renderAllUI();
+        }
+
+        function fetchChatHistoryFromLocal() {
+             const historyJson = localStorage.getItem('chat_history');
+             return historyJson ? JSON.parse(historyJson) : [];
+        }
+
+        async function saveChatHistoryToLocal(history) {
+            localStorage.setItem('chat_history', JSON.stringify(history));
+        }
+
+        // --- AI Schema Definitions (変更なし) ---
+        const NUTRITION_SCHEMA = {
+            type: "OBJECT",
+            properties: {
+                totalProtein: { type: "NUMBER", description: "総タンパク質 (g)" },
+                totalFat: { type: "NUMBER", description: "総脂質 (g)" },
+                totalCarbs: { type: "NUMBER", description: "総炭水化物 (g)" },
+                totalCalories: { type: "NUMBER", description: "総カロリー (kcal)" },
+                items: {
+                    type: "ARRAY",
+                    description: "解析された食事・運動アイテムの配列",
+                    items: {
+                        type: "OBJECT",
+                        properties: {
+                            type: { type: "STRING", enum: ["meal", "exercise"], description: "アイテムのタイプ" },
+                            description: { type: "STRING", description: "解析されたアイテムの説明" },
+                            protein: { type: "NUMBER", description: "タンパク質 (g) (運動の場合は0)" },
+                            fat: { type: "NUMBER", description: "脂質 (g) (運動の場合は0)" },
+                            carbs: { type: "NUMBER", description: "炭水化物 (g) (運動の場合は0)" },
+                            calories: { type: "NUMBER", description: "カロリー (kcal) (運動の場合は消費カロリーとしてマイナス値)" },
+                        },
+                        required: ["type", "description", "protein", "fat", "carbs", "calories"]
+                    }
+                }
+            }
+        };
+
+        const FEEDBACK_SCHEMA = {
+            type: "OBJECT",
+            properties: {
+                pfcScore: { 
+                    type: "STRING", 
+                    description: "PFCの達成度に基づく顔文字評価。例: '😁', '😐', '😫'" 
+                },
+                proteinScoreFeedback: { 
+                    type: "STRING", 
+                    description: "タンパク質摂取量に基づく具体的なフィードバック。" 
+                },
+                nextDayAdvice: { 
+                    type: "STRING", 
+                    description: "翌日の食事戦略に関する具体的なアドバイス。" 
+                }
+            }
+        };
+
+        // --- Core Application Logic (Firebase依存部分を削除) ---
+
+        /**
+         * AI API呼び出し (Exponential Backoff実装)
+         */
+        async function fetchAI(url, payload) {
+            if (!GEMINI_API_KEY) {
+                throw new Error("APIキーが設定されていません。コードを確認してください。");
+            }
+            
+            for (let attempt = 0; attempt < 5; attempt++) {
+                try {
+                    const fullUrl = `${url}${GEMINI_API_KEY}`;
+                    const response = await fetch(fullUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        const errorBody = await response.text();
+                        console.error(`Attempt ${attempt + 1}: AI API HTTP Error: ${response.status} - ${errorBody}`);
+                        if (response.status === 429 || response.status >= 500) {
+                            if (attempt < 4) {
+                                const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+                                await new Promise(resolve => setTimeout(resolve, delay));
+                                continue;
+                            } else {
+                                throw new Error("AI API呼び出しが5回失敗しました。");
+                            }
+                        } else {
+                            throw new Error(`AI API Client Error: ${response.status}`);
+                        }
+                    }
+
+                    const result = await response.json();
+                    const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                    if (!jsonText) throw new Error("AI応答からテキストコンテンツを抽出できませんでした。");
+
+                    if (payload.generationConfig && payload.generationConfig.responseMimeType === "application/json") {
+                        return JSON.parse(jsonText);
+                    } else {
+                        return jsonText; 
+                    }
+
+                } catch (error) {
+                    if (error.message.includes("failed to fetch") || error.message.includes("network error")) {
+                        if (attempt < 4) {
+                            const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            continue;
+                        }
+                    }
+                    throw error;
+                }
+            }
+        }
+
+        /**
+         * ユーザー入力から栄養素を抽出・計算する
+         */
+        async function analyzeNutrition(prompt) {
+            // ... (ロジックは変更なし)
+            const systemPrompt = `あなたは世界最高の栄養計算AIです。ユーザーの入力 (食事や運動) から、総PFCと総カロリーを計算し、JSON形式で返します。
+                食事はプラスのカロリー、運動はマイナスのカロリーとして計算してください。
+                PFCの計算は、食品データベースや一般的な栄養学に基づいて、正確に行ってください。
+                必ずitems配列を含め、各アイテムを 'meal' または 'exercise' のタイプに分類し、PFC/カロリーを具体的に計算して含めてください。
+                カロリーは四捨五入して整数にしてください。
+                例: '鶏むね肉150g, ご飯200g, ランニング30分' -> 
+                { totalProtein: 54, totalFat: 4, totalCarbs: 72, totalCalories: 532, items: [...] }`;
+
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: NUTRITION_SCHEMA
+                },
+                tools: [{ "google_search": {} }] 
+            };
+
+            return fetchAI(API_URL, payload);
+        }
+
+        /**
+         * ログ記録ボタンの処理 (AI解析)
+         */
+        submitLogButton.addEventListener('click', async () => {
+            if (!currentTargets) {
+                showModal("処理待機中", "初期設定が完了するまでお待ちください。");
+                return;
+            }
+
+            const input = logInput.value.trim();
+            if (input === '') {
+                showModal("入力が必要です", "食事内容か運動内容を入力してください。");
+                return;
+            }
+
+            submitLogButton.disabled = true;
+            logStatus.textContent = 'AIが栄養素を計算中... 🏃‍♂️🍽️';
+
+            try {
+                const analysisResult = await analyzeNutrition(input);
+                
+                if (!analysisResult) throw new Error("AI解析結果が空でした。");
+
+                const newLog = {
+                    time: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
+                    input: input,
+                    ...analysisResult,
+                    items: analysisResult.items || [] 
+                };
+
+                // 既存のログデータに加算
+                const updatedLog = {
+                    logs: [...currentLogData.logs, newLog],
+                    P: currentLogData.P + (analysisResult.totalProtein || 0),
+                    F: currentLogData.F + (analysisResult.totalFat || 0),
+                    C: currentLogData.C + (analysisResult.totalCarbs || 0),
+                    Kcal: currentLogData.Kcal + (analysisResult.totalCalories || 0),
+                    exerciseKcal: currentLogData.exerciseKcal + (analysisResult.items.filter(i => i.type === 'exercise').reduce((sum, item) => sum + Math.abs(item.calories), 0)),
+                    netKcal: currentLogData.Kcal + currentLogData.exerciseKcal + (analysisResult.totalCalories || 0)
+                };
+
+                // ローカルストレージに保存
+                await saveLogToLocal(updatedLog);
+
+                logInput.value = '';
+                logStatus.textContent = '記録完了！ (データはブラウザに保存されました)';
+
+                // AIフィードバックを非同期で実行
+                fetchFeedback(updatedLog);
+
+            } catch (error) {
+                console.error("Log Submission Error:", error);
+                logStatus.textContent = '記録に失敗しました。AIキーを確認してください。';
+                showModal("記録エラー", "栄養計算に失敗しました。AIキーが正しく設定されているか確認してください。");
+            } finally {
+                submitLogButton.disabled = false;
+            }
+        });
+
+        /**
+         * ログ記録ボタンの処理 (手動入力)
+         */
+        submitManualLogButton.addEventListener('click', async () => {
+            if (!currentTargets) {
+                showModal("処理待機中", "初期設定が完了するまでお待ちください。");
+                return;
+            }
+
+            const P = parseFloat(manualP.value) || 0;
+            const F = parseFloat(manualF.value) || 0;
+            const C = parseFloat(manualC.value) || 0;
+            const Kcal = parseFloat(manualKcal.value) || 0;
+            const description = manualDescription.value.trim() || '手動入力';
+
+            if (P === 0 && F === 0 && C === 0 && Kcal === 0) {
+                showModal("入力が必要です", "PFCまたはカロリーの値を1つ以上入力してください。");
+                return;
+            }
+
+            submitManualLogButton.disabled = true;
+            manualLogStatus.textContent = '手動で記録中...';
+
+            try {
+                const newLog = {
+                    time: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
+                    input: `(手動) ${description} P${P} F${F} C${C} Kcal${Kcal}`,
+                    totalProtein: P,
+                    totalFat: F,
+                    totalCarbs: C,
+                    totalCalories: Kcal,
+                    items: [{
+                        // カロリーが負の値（Kcal < 0）であれば運動として扱う
+                        type: Kcal < 0 ? 'exercise' : 'meal', 
+                        description: description, 
+                        protein: P, 
+                        fat: F, 
+                        carbs: C, 
+                        calories: Kcal
+                    }]
+                };
+
+                // 既存のログデータに加算
+                const updatedLog = {
+                    logs: [...currentLogData.logs, newLog],
+                    P: currentLogData.P + P,
+                    F: currentLogData.F + F,
+                    C: currentLogData.C + C,
+                    Kcal: currentLogData.Kcal + Kcal,
+                    // マイナス値の場合のみ消費カロリーとして加算 (abs(Kcal))
+                    exerciseKcal: currentLogData.exerciseKcal + (Kcal < 0 ? Math.abs(Kcal) : 0),
+                    netKcal: currentLogData.Kcal + currentLogData.exerciseKcal + Kcal
+                };
+
+                await saveLogToLocal(updatedLog);
+
+                // 入力フィールドをクリア
+                manualP.value = manualF.value = manualC.value = manualKcal.value = manualDescription.value = '';
+                manualLogStatus.textContent = '手動記録完了！';
+
+                // AIフィードバックを非同期で実行
+                fetchFeedback(updatedLog);
+
+            } catch (error) {
+                console.error("Manual Log Submission Error:", error);
+                manualLogStatus.textContent = '手動記録中にエラーが発生しました。';
+                showModal("記録エラー", "手動での記録処理中に予期せぬエラーが発生しました。");
+            } finally {
+                submitManualLogButton.disabled = false;
+            }
+        });
+
+
+        /**
+         * ログデータからAIフィードバックを生成し、UIに反映する
+         */
+        async function fetchFeedback(logData) {
+            // ... (ロジックは変更なし)
+            const systemPrompt = `あなたは専門のAIトレーナーです。以下のJSONスキーマに従って、今日のPFC達成度、トレーニング内容、および目標(${JSON.stringify(currentTargets)})に基づいてフィードバックと翌日の戦略を生成してください。`;
+
+            const prompt = `今日のログ: ${JSON.stringify(logData)}。\n現在の目標: P${currentTargets.protein}g, F${currentTargets.fat}g, C${currentTargets.carbs}g, Kcal${currentTargets.kcal}kcal。これに基づき、達成度を評価し、具体的なアドバイスと翌日の戦略を生成してください。`;
+
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: FEEDBACK_SCHEMA
+                }
+            };
+
+            try {
+                const feedbackResult = await fetchAI(API_URL, payload);
+                if (feedbackResult) {
+                    overallFace.textContent = feedbackResult.pfcScore || '🤔';
+                    pScoreFeedback.innerHTML = `**${feedbackResult.pfcScore}** ${feedbackResult.proteinScoreFeedback || '評価を生成できませんでした。'}`;
+                    nextDayAdvice.innerHTML = `**次の一手:** ${feedbackResult.nextDayAdvice || 'アドバイスを生成できませんでした。'}`;
+                }
+            } catch (error) {
+                console.error("Feedback Generation Error:", error);
+                overallFace.textContent = 'エラー';
+                pScoreFeedback.textContent = 'フィードバック生成中にエラーが発生しました。';
+            }
+        }
+        
+        /**
+         * チャットUIをレンダリングする
+         */
+        function renderChatHistory(history) {
+            chatOutput.innerHTML = '';
+            history.forEach(msg => {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = msg.role === 'user' ? 
+                    'text-right p-2 bg-blue-100 rounded-lg max-w-xs ml-auto' : 
+                    'text-left p-2 bg-gray-200 rounded-lg max-w-xs mr-auto';
+                messageDiv.innerHTML = `<strong>${msg.role === 'user' ? 'You' : 'AI'}:</strong> ${msg.text}`;
+                chatOutput.appendChild(messageDiv);
+            });
+            chatOutput.scrollTop = chatOutput.scrollHeight;
+        }
+
+        /**
+         * チャット送信ボタンの処理
+         */
+        sendChatButton.addEventListener('click', async () => {
+            const prompt = chatInput.value.trim();
+            if (prompt === '') return;
+
+            // 履歴に追加 (ユーザー)
+            let currentHistory = fetchChatHistoryFromLocal();
+            currentHistory.push({ role: 'user', text: prompt });
+            renderChatHistory(currentHistory);
+            chatInput.value = '';
+            sendChatButton.disabled = true;
+
+            const systemPrompt = "あなたはユーザーの栄養とトレーニングの質問に答えるフレンドリーなAIトレーナーです。ユーザーの質問には、Google検索機能を使って最新の情報に基づいて、簡潔に回答してください。";
+
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                tools: [{ "google_search": {} }]
+            };
+
+            try {
+                const result = await fetchAI(API_URL, payload);
+
+                // 履歴に追加 (AI)
+                currentHistory.push({ role: 'ai', text: result });
+                saveChatHistoryToLocal(currentHistory); // ローカルストレージに保存
+
+            } catch (error) {
+                console.error("Chat API Error:", error);
+                let currentHistory = fetchChatHistoryFromLocal(); // エラー時に再取得
+                currentHistory.push({ role: 'ai', text: 'ごめんなさい、AIとの通信中にエラーが発生しました。APIキーが正しいか確認してください。' });
+                saveChatHistoryToLocal(currentHistory); 
+            } finally {
+                sendChatButton.disabled = false;
+            }
+        });
+        
+        // --- UI Rendering (変更なし) ---
+        function renderAllUI() {
+            if (!currentTargets || !currentLogData) { return; }
+            renderDailyLogs();
+            renderTargetSummary();
+            renderPFCVisualization();
+            
+            const baseKcalTarget = currentTargets.kcal || 2500;
+            const netKcalTarget = baseKcalTarget + currentLogData.exerciseKcal;
+            
+            const kcalPercentage = currentLogData.Kcal / netKcalTarget;
+            const pfcPercentage = [
+                currentLogData.P / currentTargets.protein,
+                currentLogData.F / currentTargets.fat,
+                currentLogData.C / currentTargets.carbs
+            ].filter(p => p > 0).reduce((a, b) => a + b, 0) / 3;
+
+            let faceIcon = '🤔';
+            if (kcalPercentage > 0.9 && kcalPercentage < 1.1 && pfcPercentage > 0.8) {
+                faceIcon = '😁';
+            } else if (kcalPercentage > 1.2 || kcalPercentage < 0.8) {
+                faceIcon = '😫';
+            } else if (kcalPercentage > 0.8 && pfcPercentage > 0.5) {
+                faceIcon = '😐';
+            }
+            overallFace.textContent = faceIcon;
+        }
+
+        function renderDailyLogs() {
+            dailyLogEntries.innerHTML = '';
+            document.getElementById('log-date').textContent = todayKey();
+
+            if (currentLogData.logs.length === 0) {
+                noLogMessage.classList.remove('hidden');
+                return;
+            } else {
+                noLogMessage.classList.add('hidden');
+            }
+
+            currentLogData.logs.slice().reverse().forEach((log) => {
+                const isExercise = log.items.some(item => item.type === 'exercise');
+                const logType = isExercise ? '運動' : '食事';
+                const bgColor = isExercise ? 'bg-green-50' : 'bg-blue-50';
+                const icon = isExercise ? '🏃‍♂️' : '🍽️';
+
+                const detailText = log.items.map(item => {
+                    const cals = item.calories !== 0 ? `(${formatKcal(item.calories)})` : '';
+                    if (item.type === 'meal') {
+                        return `${item.description}: P${formatPFC(item.protein)} F${formatPFC(item.fat)} C${formatPFC(item.carbs)}`;
+                    } else {
+                        // 運動の場合、消費カロリーとして表示
+                        return `${item.description}: 消費${formatKcal(Math.abs(item.calories))}`;
+                    }
+                }).join(' / ');
+                
+                // メインの表示内容を調整: 手動入力の場合、inputをそのまま表示
+                const displayText = log.input.startsWith('(手動)') ? log.input.replace('(手動) ', '') : log.input;
+
+
+                const logElement = document.createElement('div');
+                logElement.className = `${bgColor} p-3 rounded-lg flex justify-between items-center transition duration-150 hover:shadow-md`;
+                logElement.innerHTML = `
+                    <div class="flex-grow">
+                        <span class="font-bold text-gray-800">${icon} ${log.time} (${logType})</span>
+                        <p class="text-xs text-gray-600 mt-1">${displayText}</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-sm font-semibold text-gray-700">${formatKcal(log.totalCalories)}</span>
+                        <p class="text-xs text-gray-500">${detailText}</p>
+                    </div>
+                `;
+                dailyLogEntries.appendChild(logElement);
+            });
+        }
+
+        function renderTargetSummary() {
+            targetSummary.innerHTML = '';
+            
+            const baseKcalTarget = currentTargets.kcal || 2500;
+            const netKcalTarget = baseKcalTarget + currentLogData.exerciseKcal;
+            
+            const stats = [
+                { label: 'タンパク質', unit: 'g', target: currentTargets.protein, current: currentLogData.P, color: 'blue' },
+                { label: '脂質', unit: 'g', target: currentTargets.fat, current: currentLogData.F, color: 'red' },
+                { label: '炭水化物', unit: 'g', target: currentTargets.carbs, current: currentLogData.C, color: 'yellow' },
+                { label: '実質Kcal', unit: 'kcal', target: netKcalTarget, current: currentLogData.Kcal, color: 'green' }
+            ];
+
+            stats.forEach(stat => {
+                const element = document.createElement('div');
+                element.className = 'p-3 bg-gray-50 rounded-lg';
+                element.innerHTML = `
+                    <p class="text-xs font-medium text-gray-500">${stat.label}</p>
+                    <p class="text-xl font-extrabold text-${stat.color}-600">${formatKcal(stat.current)}</p>
+                    <p class="text-sm text-gray-500">目標: ${formatKcal(stat.target)}</p>
+                `;
+                targetSummary.appendChild(element);
+            });
+        }
+
+        function renderPFCVisualization() {
+            pfcVisualization.innerHTML = '';
+            
+            const baseKcalTarget = currentTargets.kcal || 2500;
+            const netKcalTarget = baseKcalTarget + currentLogData.exerciseKcal;
+
+            const stats = [
+                { label: 'タンパク質 (P)', target: currentTargets.protein, current: currentLogData.P, color: 'blue' },
+                { label: '脂質 (F)', target: currentTargets.fat, current: currentLogData.F, color: 'red' },
+                { label: '炭水化物 (C)', target: currentTargets.carbs, current: currentLogData.C, color: 'yellow' },
+                { label: `ネットカロリー (目標:${formatKcal(netKcalTarget)} / 消費:${formatKcal(currentLogData.exerciseKcal)})`, target: netKcalTarget, current: currentLogData.Kcal, color: 'green' }
+            ];
+
+            stats.forEach(stat => {
+                const percentage = stat.current / stat.target;
+                const progressWidth = Math.min(percentage * 100, 100);
+                const isOver = percentage > 1;
+                const statusColor = isOver ? 'bg-purple-500' : `bg-${stat.color}-500`;
+                const textColor = isOver ? 'text-purple-700' : `text-${stat.color}-700`;
+                const labelColor = isOver ? 'text-purple-600 font-bold' : 'text-gray-700';
+                
+                pfcVisualization.innerHTML += `
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="${labelColor} text-sm">${stat.label}</span>
+                            <span class="${textColor} text-sm font-semibold">${formatKcal(stat.current)} / ${formatKcal(stat.target)} ${stat.current > stat.target ? '(OVER)' : ''}</span>
+                        </div>
+                        <div class="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                            <div class="h-full ${statusColor} rounded-full pfc-indicator" style="width: ${progressWidth}%;"></div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+        
+        // --- Initialization ---
+        // Firebase認証は不要になったため、ローカルデータのロードを実行
+        loadTargetsAndLogsFromLocal();
+
+    </script>
+</body>
+</html>
